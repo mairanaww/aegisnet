@@ -1,0 +1,27 @@
+{
+  "risk_scoring": {
+    "description": "Risk Scoring Engine configuration (Step 10)",
+    "weights": {
+      "anomaly_score": 0.5,
+      "privilege_escalation": 0.3,
+      "lateral_movement": 0.2
+    },
+    "thresholds": {
+      "low":    0.3,
+      "medium": 0.7,
+      "high":   1.0
+    },
+    "normalization_limits": {
+      "syn_flag_count_max": 100,
+      "fin_flag_count_max": 50,
+      "ack_flag_count_max": 200,
+      "pst_flag_count_max": 50,
+      "urg_flag_count_max": 20
+    }
+  },
+  "comments": {
+    "weights": "Tunable by Policy Team (Person 5). Must sum to 1.0. Adjust based on business risk tolerance.",
+    "thresholds": "Risk level boundaries. LOW < 0.3 → no action, 0.3-0.7 MEDIUM → rate-limit, ≥0.7 HIGH → isolate+honeypot",
+    "normalization_limits": "Baseline maximums for normalizing sub-signals. Update based on your environment's attack baseline."
+  }
+}
