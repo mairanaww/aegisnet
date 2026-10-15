@@ -10,19 +10,20 @@ Score interpretation:
     > 0.7   → HIGH   (likely attack) → policy engine triggers isolation
 """
 
-import os
 import json
 import logging
+import os
+from datetime import datetime
+
+import joblib
 import numpy as np
 import pandas as pd
-import joblib
-from datetime import datetime
 from sklearn.ensemble import IsolationForest, RandomForestClassifier
-from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.metrics import f1_score, precision_score, recall_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-# ── Logging setup 
+# ── Logging setup
 os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
@@ -34,12 +35,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ── Paths 
-MODEL_PATH     = "models/isolation_forest.pkl"
-SCALER_PATH    = "models/scaler.pkl"
-FEATURES_PATH  = "models/feature_columns.pkl"
-SCORE_LOG      = "logs/anomaly_scores.jsonl"
-SCORE_STATS    = "models/score_stats.pkl"
+# ── Paths
+MODEL_PATH = "models/isolation_forest.pkl"
+SCALER_PATH = "models/scaler.pkl"
+FEATURES_PATH = "models/feature_columns.pkl"
+SCORE_LOG = "logs/anomaly_scores.jsonl"
+SCORE_STATS = "models/score_stats.pkl"
 CALIBRATOR_PATH = "models/score_calibrator.pkl"
 MAX_BENIGN_PER_FILE = 200_000
 CALIBRATION_SKIP_HEAD = 2_000
@@ -53,10 +54,14 @@ _SCORE_STATS_CACHE = None
 _CALIBRATOR_CACHE = None
 _ARTIFACT_MTIMES = {}
 
-# ── Columns to DROP (non-numeric / identifier columns) 
+# ── Columns to DROP (non-numeric / identifier columns)
 DROP_COLS = {
-    "Flow ID", "Source IP", "Destination IP",
-    "Timestamp", "Label", " Label",
+    "Flow ID",
+    "Source IP",
+    "Destination IP",
+    "Timestamp",
+    "Label",
+    " Label",
 }
 
 CALIBRATION_FILES = [
@@ -74,6 +79,7 @@ CALIBRATION_FILES = [
 # ══════════════════════════════════════════════════════════════════════════════
 # Internal helpers
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _signed_log1p(x: np.ndarray) -> np.ndarray:
     """Apply signed log1p transformation: preserves sign, compresses magnitude."""
@@ -96,11 +102,11 @@ def _raw_to_score(raw: float, lo: float, hi: float) -> float:
     In Isolation Forest:
       - NEGATIVE raw = anomaly (easy to isolate)
       - POSITIVE raw = normal (hard to isolate)
-    
+
     We want output [0, 1] where:
       - 0 = normal (positive raw, within percentiles)
       - 1 = anomalous (negative raw, outliers)
-    
+
     Strategy: invert the raw score so positive→low anomaly, negative→high anomaly
     """
     denom = (hi - lo) if (hi - lo) > 1e-12 else 1.0
@@ -123,9 +129,9 @@ def _log_score(anomaly_score: float, extra: dict = None):
     """Append score entry to JSONL log (used by Step 17 feedback loop)."""
     os.makedirs("logs", exist_ok=True)
     entry = {
-        "timestamp":     datetime.now().isoformat(),
+        "timestamp": datetime.now().isoformat(),
         "anomaly_score": anomaly_score,
-        "risk_level":    _classify_risk(anomaly_score),
+        "risk_level": _classify_risk(anomaly_score),
     }
     if extra:
         entry.update(extra)
@@ -148,7 +154,9 @@ def _load_artifacts():
         _SCALER_CACHE = joblib.load(SCALER_PATH)
         _FEATURES_CACHE = joblib.load(FEATURES_PATH)
         _SCORE_STATS_CACHE = joblib.load(SCORE_STATS)
-        _CALIBRATOR_CACHE = joblib.load(CALIBRATOR_PATH) if os.path.exists(CALIBRATOR_PATH) else None
+        _CALIBRATOR_CACHE = (
+            joblib.load(CALIBRATOR_PATH) if os.path.exists(CALIBRATOR_PATH) else None
+        )
         _ARTIFACT_MTIMES = mtimes
 
     return _MODEL_CACHE, _SCALER_CACHE, _FEATURES_CACHE, _SCORE_STATS_CACHE, _CALIBRATOR_CACHE
@@ -228,13 +236,16 @@ def _build_calibration_dataset(feature_cols: list):
 
     X_bal = X_all[keep_idx]
     y_bal = y_all[keep_idx]
-    logger.info(f"Calibration aggregate after balancing: samples={len(y_bal):,} (per class={minority:,})")
+    logger.info(
+        f"Calibration aggregate after balancing: samples={len(y_bal):,} (per class={minority:,})"
+    )
     return X_bal, y_bal
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Public API
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def train_model(csv_paths) -> None:
     """
@@ -247,22 +258,22 @@ def train_model(csv_paths) -> None:
     # Handle both single file and list of files
     if isinstance(csv_paths, str):
         csv_paths = [csv_paths]
-    
+
     os.makedirs("models", exist_ok=True)
-    os.makedirs("logs",   exist_ok=True)
-    os.makedirs("data",   exist_ok=True)
+    os.makedirs("logs", exist_ok=True)
+    os.makedirs("data", exist_ok=True)
 
     # ── Load and combine BENIGN rows from all files ─────────────────────────
     dfs = []
     total_benign = 0
     total_benign_used = 0
     label_col = "Label"
-    
+
     for csv_path in csv_paths:
         logger.info(f"Loading dataset: {csv_path}")
         df = pd.read_csv(csv_path, encoding="utf-8", low_memory=False)
         df.columns = df.columns.str.strip()
-        
+
         # Filter BENIGN only
         df_benign = df[df[label_col].str.strip() == "BENIGN"]
         benign_count = len(df_benign)
@@ -276,9 +287,9 @@ def train_model(csv_paths) -> None:
             logger.info(f"  BENIGN rows: {benign_count:,}")
 
         total_benign_used += len(df_benign)
-        
+
         dfs.append(df_benign)
-    
+
     # Combine all BENIGN rows
     df = pd.concat(dfs, ignore_index=True)
     logger.info(f"Total BENIGN rows found: {total_benign:,}")
@@ -296,7 +307,7 @@ def train_model(csv_paths) -> None:
     logger.info("Saved -> data/normal_traffic.csv")
 
     # ── Scale with StandardScaler ───────────────────────────────────────────
-    scaler   = StandardScaler()
+    scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
     # ── Train with conservative contamination to protect precision ───────────
@@ -370,11 +381,11 @@ def train_model(csv_paths) -> None:
     else:
         logger.warning("Calibration dataset unavailable; using pure IsolationForest scoring")
 
-    # ── Persist 
-    joblib.dump(model,        MODEL_PATH)
-    joblib.dump(scaler,       SCALER_PATH)
+    # ── Persist
+    joblib.dump(model, MODEL_PATH)
+    joblib.dump(scaler, SCALER_PATH)
     joblib.dump(feature_cols, FEATURES_PATH)
-    joblib.dump(score_stats,  SCORE_STATS)
+    joblib.dump(score_stats, SCORE_STATS)
     if calibrator is not None:
         joblib.dump(calibrator, CALIBRATOR_PATH)
     elif os.path.exists(CALIBRATOR_PATH):
@@ -420,8 +431,7 @@ def score_session(feature_vector, log_score: bool = True) -> float:
     for path in (MODEL_PATH, SCALER_PATH, FEATURES_PATH, SCORE_STATS):
         if not os.path.exists(path):
             raise FileNotFoundError(
-                f"Artifact not found: {path}\n"
-                "Run train.py first to train the model."
+                f"Artifact not found: {path}\nRun train.py first to train the model."
             )
 
     model, scaler, feature_cols, score_stats, calibrator = _load_artifacts()
@@ -448,8 +458,8 @@ def score_session(feature_vector, log_score: bool = True) -> float:
 
     # ── Score ──────────────────────────────────────────────────────────────
     row_values = row.values.astype(float, copy=False)
-    X_scaled   = scaler.transform(row_values)
-    raw_score   = model.decision_function(X_scaled)[0]
+    X_scaled = scaler.transform(row_values)
+    raw_score = model.decision_function(X_scaled)[0]
     anomaly_score = _raw_to_score(raw_score, score_stats["lo"], score_stats["hi"])
 
     # Blend unsupervised anomaly score with supervised attack probability.

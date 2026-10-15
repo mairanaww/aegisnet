@@ -7,7 +7,8 @@ supporting testing of anomaly detection, behavioral clustering, and risk scoring
 
 import os
 import sys
-from typing import Any, Dict, List
+from typing import Any
+
 import pytest
 
 # Ensure project root is at the head of sys.path
@@ -17,7 +18,7 @@ if PROJECT_ROOT not in sys.path:
 
 
 @pytest.fixture
-def sample_flow_features() -> Dict[str, Any]:
+def sample_flow_features() -> dict[str, Any]:
     """
     Returns a realistic CICIDS-2017 feature vector representing normal/benign network traffic.
     Uses CICIDS standard column naming convention with leading spaces.
@@ -51,7 +52,7 @@ def sample_flow_features() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def malicious_flow_features() -> Dict[str, Any]:
+def malicious_flow_features() -> dict[str, Any]:
     """
     Returns a feature vector representing an attack flow with high SYN count,
     high packet rate, elevated RST count, and high flag manipulation.
@@ -85,7 +86,7 @@ def malicious_flow_features() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def sample_feature_vector_list(sample_flow_features: Dict[str, Any]) -> List[Any]:
+def sample_feature_vector_list(sample_flow_features: dict[str, Any]) -> list[Any]:
     """
     Returns a list version (values only) of sample_flow_features for testing list input format.
     """

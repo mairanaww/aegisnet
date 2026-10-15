@@ -21,11 +21,13 @@ Requirements:
 
 import os
 import sys
-import pandas as pd
-import numpy as np
+
 import joblib
 import matplotlib.pyplot as plt
-from anomaly_model import score_session, MODEL_PATH, FEATURES_PATH
+import numpy as np
+import pandas as pd
+
+from anomaly_model import FEATURES_PATH, MODEL_PATH, score_session
 
 TARGET_PRECISION = 0.85
 TARGET_RECALL = 0.85
@@ -40,32 +42,33 @@ def find_best_threshold(benign_scores, attack_scores, target_precision=TARGET_PR
     best_f1 = -1.0
     best_f1_threshold = 0.5
     best_f1_precision = 0.0
-    
+
     print("\nThreshold Calibration (from test data):")
     print("Threshold | TP   | FP   | Precision | Recall | F1-Score | Selection")
     print("-" * 75)
-    
+
     for thresh in np.arange(0.05, 0.96, 0.025):
         tp = np.sum(attack_scores >= thresh)
         fp = np.sum(benign_scores >= thresh)
         fn = len(attack_scores) - tp
-        tn = len(benign_scores) - fp
-        
+
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
         recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
         f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
-        
+
         marker = ""
         # Track threshold that preserves precision target and maximizes recall.
         if precision >= target_precision:
             better_recall = recall > best_recall + 1e-12
-            same_recall_better_precision = abs(recall - best_recall) <= 1e-12 and precision > best_precision
+            same_recall_better_precision = (
+                abs(recall - best_recall) <= 1e-12 and precision > best_precision
+            )
             if better_recall or same_recall_better_precision:
                 best_precision = precision
                 best_recall = recall
                 best_threshold = thresh
                 marker = "[PRECISION_TARGET]"
-        
+
         # Track F1-focused threshold
         if f1 > best_f1:
             best_f1 = f1
@@ -73,31 +76,41 @@ def find_best_threshold(benign_scores, attack_scores, target_precision=TARGET_PR
             best_f1_precision = precision
             if not marker:
                 marker = "[BEST_F1]"
-        
-        print(f"  {thresh:.2f}   | {tp:4d} | {fp:4d} | {precision:8.1%}  | {recall:6.1%} | {f1:7.4f} | {marker}")
-    
+
+        print(
+            f"  {thresh:.2f}   | {tp:4d} | {fp:4d} | {precision:8.1%}  | {recall:6.1%} | {f1:7.4f} | {marker}"
+        )
+
     if best_threshold is not None:
-        print(f"\n  → Selected threshold: {best_threshold:.2f} (precision target met, recall={best_recall:.1%}, precision={best_precision:.1%})")
+        print(
+            f"\n  → Selected threshold: {best_threshold:.2f} (precision target met, recall={best_recall:.1%}, precision={best_precision:.1%})"
+        )
         print(f"  → Best F1 threshold: {best_f1_threshold:.2f} (F1={best_f1:.4f})")
         print()
         return best_threshold, best_precision
 
     print(f"\n  → No threshold reached target precision {target_precision:.0%}")
-    print(f"  → Falling back to best F1 threshold: {best_f1_threshold:.2f} (F1={best_f1:.4f}, precision={best_f1_precision:.1%})")
+    print(
+        f"  → Falling back to best F1 threshold: {best_f1_threshold:.2f} (F1={best_f1:.4f}, precision={best_f1_precision:.1%})"
+    )
     print()
     return best_f1_threshold, best_f1_precision
+
 
 # Test datasets with diverse attack types
 TEST_FILES = [
     ("data/Tuesday-WorkingHours.pcap_ISCX.csv", "Brute Force (FTP/SSH)"),
     ("data/Wednesday-workingHours.pcap_ISCX.csv", "DoS (Hulk, GoldenEye, slowloris)"),
-    ("data/Thursday-WorkingHours-Morning-WebAttacks.pcap_ISCX.csv", "Web Attacks (XSS, SQL Injection, Brute Force)"),
+    (
+        "data/Thursday-WorkingHours-Morning-WebAttacks.pcap_ISCX.csv",
+        "Web Attacks (XSS, SQL Injection, Brute Force)",
+    ),
     ("data/Friday-WorkingHours-Morning.pcap_ISCX.csv", "Bot Attacks"),
     ("data/Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv", "DDoS"),
     ("data/Friday-WorkingHours-Afternoon-PortScan.pcap_ISCX.csv", "Port Scanning"),
 ]
 
-SAMPLE_SIZE = 500   # rows per attack type
+SAMPLE_SIZE = 500  # rows per attack type
 
 
 def check_model_exists():
@@ -115,9 +128,9 @@ def quick_smoke_test():
     feature_cols = joblib.load(FEATURES_PATH)
 
     # All-zero vector → should look normal
-    normal_fv  = {col: 0.0 for col in feature_cols}
+    normal_fv = {col: 0.0 for col in feature_cols}
     # Large values → should look anomalous
-    attack_fv  = {col: 1e6 for col in feature_cols}
+    attack_fv = {col: 1e6 for col in feature_cols}
 
     score_normal = score_session(normal_fv, log_score=False)
     score_attack = score_session(attack_fv, log_score=False)
@@ -139,14 +152,14 @@ def test_by_attack_type():
 
     feature_cols = joblib.load(FEATURES_PATH)
     label_col = "Label"
-    
+
     # Collect all scores for threshold calibration
     all_benign_scores = []
     all_attack_scores = []
     attack_by_type = {}
 
     print("\n[PHASE 1] Collecting scores from all test data...")
-    
+
     for csv_path, attack_name in TEST_FILES:
         if not os.path.exists(csv_path):
             continue
@@ -182,13 +195,15 @@ def test_by_attack_type():
     print("\n[PHASE 2] Calibrating optimal threshold...")
     all_benign_scores = np.array(all_benign_scores)
     all_attack_scores = np.array(all_attack_scores)
-    
+
     best_threshold, best_precision = find_best_threshold(all_benign_scores, all_attack_scores)
-    
+
     # Now evaluate with best threshold
     print(f"\n[PHASE 3] Evaluating with optimal threshold: {best_threshold:.2f}")
     print()
-    print("Attack Type                               | TP    | FP    | Precision | Recall | F1-Score")
+    print(
+        "Attack Type                               | TP    | FP    | Precision | Recall | F1-Score"
+    )
     print("-" * 95)
 
     rows_tested = 0
@@ -214,7 +229,9 @@ def test_by_attack_type():
         rows_tested += len(attack_scores) + len(benign_scores)
 
         marker = " [PASS]" if precision >= 0.80 else ""
-        print(f"{attack_name:40s} | {tp:5d} | {fp:5d} | {precision:8.1%}   | {recall:6.1%} | {f1:.4f}{marker}")
+        print(
+            f"{attack_name:40s} | {tp:5d} | {fp:5d} | {precision:8.1%}   | {recall:6.1%} | {f1:.4f}{marker}"
+        )
 
     print()
     print("=" * 95)
@@ -228,7 +245,11 @@ def test_by_attack_type():
 
     overall_precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
     overall_recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-    overall_f1 = 2 * (overall_precision * overall_recall) / (overall_precision + overall_recall) if (overall_precision + overall_recall) > 0 else 0.0
+    overall_f1 = (
+        2 * (overall_precision * overall_recall) / (overall_precision + overall_recall)
+        if (overall_precision + overall_recall) > 0
+        else 0.0
+    )
     accuracy = (tp + tn) / (tp + tn + fp + fn) if (tp + tn + fp + fn) > 0 else 0.0
     specificity = tn / (tn + fp) if (tn + fp) > 0 else 0.0
 
@@ -251,11 +272,11 @@ def test_by_attack_type():
         print(f"  → Current precision: {overall_precision:.1%} (need {TARGET_PRECISION:.0%})")
         print(f"  → Current recall:    {overall_recall:.1%} (need {TARGET_RECALL:.0%})")
         print(f"  → Current F1-Score:  {overall_f1:.4f}")
-        print(f"  → Improvements: log-transform features, RobustScaler, contamination=0.001")
+        print("  → Improvements: log-transform features, RobustScaler, contamination=0.001")
     else:
         print(f"  → Model meets precision and recall requirements ≥{TARGET_PRECISION:.0%}")
         print(f"  → F1-Score {overall_f1:.4f} indicates balanced precision-recall tradeoff")
-    
+
     return overall_stats  # Return confusion matrix data for visualization
 
 
@@ -274,8 +295,6 @@ def create_confusion_matrix_visualizations(overall_stats):
     recall = TP / (TP + FN) if (TP + FN) > 0 else 0.0
     specificity = TN / (TN + FP) if (TN + FP) > 0 else 0.0
     accuracy = (TP + TN) / (TP + FP + TN + FN) if (TP + FP + TN + FN) > 0 else 0.0
-    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
-
     print("\n" + "=" * 80)
     print("GENERATING CONFUSION MATRIX VISUALIZATIONS")
     print("=" * 80)
@@ -288,78 +307,102 @@ def create_confusion_matrix_visualizations(overall_stats):
 
     # Left: Raw counts
     ax1 = axes[0]
-    im1 = ax1.imshow(cm, cmap='Blues', aspect='auto')
+    im1 = ax1.imshow(cm, cmap="Blues", aspect="auto")
     ax1.set_xticks([0, 1])
     ax1.set_yticks([0, 1])
-    ax1.set_xticklabels(['Negative\n(Benign)', 'Positive\n(Attack)'], fontsize=11)
-    ax1.set_yticklabels(['Actual\nNegative', 'Actual\nPositive'], fontsize=11)
-    ax1.set_title('Confusion Matrix (Counts)', fontsize=14, fontweight='bold', pad=15)
-    ax1.set_ylabel('True Label', fontsize=12)
-    ax1.set_xlabel('Predicted Label', fontsize=12)
+    ax1.set_xticklabels(["Negative\n(Benign)", "Positive\n(Attack)"], fontsize=11)
+    ax1.set_yticklabels(["Actual\nNegative", "Actual\nPositive"], fontsize=11)
+    ax1.set_title("Confusion Matrix (Counts)", fontsize=14, fontweight="bold", pad=15)
+    ax1.set_ylabel("True Label", fontsize=12)
+    ax1.set_xlabel("Predicted Label", fontsize=12)
 
     for i in range(2):
         for j in range(2):
             value = cm[i, j]
-            text = ax1.text(j, i, f'{value}', ha="center", va="center",
-                           color="white" if value > cm.max()/2 else "black",
-                           fontsize=16, fontweight='bold')
+            ax1.text(
+                j,
+                i,
+                f"{value}",
+                ha="center",
+                va="center",
+                color="white" if value > cm.max() / 2 else "black",
+                fontsize=16,
+                fontweight="bold",
+            )
 
-    plt.colorbar(im1, ax=ax1, label='Count')
+    plt.colorbar(im1, ax=ax1, label="Count")
 
     # Right: Normalized percentages
     ax2 = axes[1]
-    cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
-    im2 = ax2.imshow(cm_normalized, cmap='RdYlGn', aspect='auto', vmin=0, vmax=1)
+    cm_normalized = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis]
+    im2 = ax2.imshow(cm_normalized, cmap="RdYlGn", aspect="auto", vmin=0, vmax=1)
     ax2.set_xticks([0, 1])
     ax2.set_yticks([0, 1])
-    ax2.set_xticklabels(['Negative\n(Benign)', 'Positive\n(Attack)'], fontsize=11)
-    ax2.set_yticklabels(['Actual\nNegative', 'Actual\nPositive'], fontsize=11)
-    ax2.set_title('Confusion Matrix (Normalized %)', fontsize=14, fontweight='bold', pad=15)
-    ax2.set_ylabel('True Label', fontsize=12)
-    ax2.set_xlabel('Predicted Label', fontsize=12)
+    ax2.set_xticklabels(["Negative\n(Benign)", "Positive\n(Attack)"], fontsize=11)
+    ax2.set_yticklabels(["Actual\nNegative", "Actual\nPositive"], fontsize=11)
+    ax2.set_title("Confusion Matrix (Normalized %)", fontsize=14, fontweight="bold", pad=15)
+    ax2.set_ylabel("True Label", fontsize=12)
+    ax2.set_xlabel("Predicted Label", fontsize=12)
 
     for i in range(2):
         for j in range(2):
             pct = cm_normalized[i, j]
-            text = ax2.text(j, i, f'{pct:.1%}', ha="center", va="center",
-                           color="white" if pct > 0.5 else "black",
-                           fontsize=16, fontweight='bold')
+            ax2.text(
+                j,
+                i,
+                f"{pct:.1%}",
+                ha="center",
+                va="center",
+                color="white" if pct > 0.5 else "black",
+                fontsize=16,
+                fontweight="bold",
+            )
 
-    plt.colorbar(im2, ax=ax2, label='Percentage')
+    plt.colorbar(im2, ax=ax2, label="Percentage")
     plt.tight_layout()
-    plt.savefig('outputs/confusion_matrix.png', dpi=300, bbox_inches='tight')
+    plt.savefig("outputs/confusion_matrix.png", dpi=300, bbox_inches="tight")
     print("✓ Saved: outputs/confusion_matrix.png")
     plt.close(fig)
 
     # 2. Metrics Comparison Bar Chart
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    metrics = ['Precision', 'Recall', 'Specificity', 'Accuracy']
+    metrics = ["Precision", "Recall", "Specificity", "Accuracy"]
     values = [precision, recall, specificity, accuracy]
     targets = [0.80, 0.85, 0.90, 0.85]
-    colors = ['#2ecc71' if v >= t else '#f39c12' for v, t in zip(values, targets)]
+    colors = ["#2ecc71" if v >= t else "#f39c12" for v, t in zip(values, targets)]
 
     x_pos = np.arange(len(metrics))
-    bars = ax.bar(x_pos, values, color=colors, alpha=0.8, edgecolor='black', linewidth=2, width=0.6)
+    bars = ax.bar(x_pos, values, color=colors, alpha=0.8, edgecolor="black", linewidth=2, width=0.6)
 
     for bar, val in zip(bars, values):
         height = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width()/2., height,
-                f'{val:.1%}',
-                ha='center', va='bottom', fontsize=12, fontweight='bold')
+        ax.text(
+            bar.get_x() + bar.get_width() / 2.0,
+            height,
+            f"{val:.1%}",
+            ha="center",
+            va="bottom",
+            fontsize=12,
+            fontweight="bold",
+        )
 
     ax.set_xticks(x_pos)
     ax.set_xticklabels(metrics, fontsize=11)
     ax.set_ylim([0, 1.05])
-    ax.set_ylabel('Score', fontsize=12, fontweight='bold')
-    ax.set_title('Model Performance Metrics', fontsize=14, fontweight='bold')
-    ax.grid(axis='y', alpha=0.3)
-    ax.axhline(y=0.85, color='red', linestyle='--', linewidth=2, alpha=0.7, label='High Target (85%)')
-    ax.axhline(y=0.80, color='orange', linestyle='--', linewidth=2, alpha=0.7, label='Min Target (80%)')
-    ax.legend(fontsize=10, loc='lower right')
+    ax.set_ylabel("Score", fontsize=12, fontweight="bold")
+    ax.set_title("Model Performance Metrics", fontsize=14, fontweight="bold")
+    ax.grid(axis="y", alpha=0.3)
+    ax.axhline(
+        y=0.85, color="red", linestyle="--", linewidth=2, alpha=0.7, label="High Target (85%)"
+    )
+    ax.axhline(
+        y=0.80, color="orange", linestyle="--", linewidth=2, alpha=0.7, label="Min Target (80%)"
+    )
+    ax.legend(fontsize=10, loc="lower right")
 
     plt.tight_layout()
-    plt.savefig('outputs/metrics_comparison.png', dpi=300, bbox_inches='tight')
+    plt.savefig("outputs/metrics_comparison.png", dpi=300, bbox_inches="tight")
     print("✓ Saved: outputs/metrics_comparison.png")
     plt.close(fig)
 
@@ -368,26 +411,41 @@ def create_confusion_matrix_visualizations(overall_stats):
 
     # Overall Classification
     sizes_pred = [TP + TN, FP + FN]
-    labels_pred = [f'Correct\n{TP + TN}\n({(TP+TN)/(TP+FP+TN+FN):.1%})', 
-                   f'Incorrect\n{FP + FN}\n({(FP+FN)/(TP+FP+TN+FN):.1%})']
-    colors_pred = ['#2ecc71', '#e74c3c']
+    labels_pred = [
+        f"Correct\n{TP + TN}\n({(TP + TN) / (TP + FP + TN + FN):.1%})",
+        f"Incorrect\n{FP + FN}\n({(FP + FN) / (TP + FP + TN + FN):.1%})",
+    ]
+    colors_pred = ["#2ecc71", "#e74c3c"]
     explode_pred = (0.05, 0.05)
-    axes[0].pie(sizes_pred, labels=labels_pred, colors=colors_pred, autopct='%1.1f%%',
-                startangle=90, textprops={'fontsize': 10, 'weight': 'bold'}, explode=explode_pred)
-    axes[0].set_title('Overall Classification Result', fontsize=12, fontweight='bold')
+    axes[0].pie(
+        sizes_pred,
+        labels=labels_pred,
+        colors=colors_pred,
+        autopct="%1.1f%%",
+        startangle=90,
+        textprops={"fontsize": 10, "weight": "bold"},
+        explode=explode_pred,
+    )
+    axes[0].set_title("Overall Classification Result", fontsize=12, fontweight="bold")
 
     # Attack Detection Rate
     sizes_attack = [TP, FN]
-    labels_attack = [f'Detected\n{TP}\n({recall:.1%})', 
-                     f'Missed\n{FN}\n({(FN)/(TP+FN):.1%})']
-    colors_attack = ['#2ecc71', '#e74c3c']
+    labels_attack = [f"Detected\n{TP}\n({recall:.1%})", f"Missed\n{FN}\n({(FN) / (TP + FN):.1%})"]
+    colors_attack = ["#2ecc71", "#e74c3c"]
     explode_attack = (0.05, 0.05)
-    axes[1].pie(sizes_attack, labels=labels_attack, colors=colors_attack, autopct='%1.1f%%',
-                startangle=90, textprops={'fontsize': 10, 'weight': 'bold'}, explode=explode_attack)
-    axes[1].set_title('Attack Detection Rate (Recall)', fontsize=12, fontweight='bold')
+    axes[1].pie(
+        sizes_attack,
+        labels=labels_attack,
+        colors=colors_attack,
+        autopct="%1.1f%%",
+        startangle=90,
+        textprops={"fontsize": 10, "weight": "bold"},
+        explode=explode_attack,
+    )
+    axes[1].set_title("Attack Detection Rate (Recall)", fontsize=12, fontweight="bold")
 
     plt.tight_layout()
-    plt.savefig('outputs/classification_outcomes.png', dpi=300, bbox_inches='tight')
+    plt.savefig("outputs/classification_outcomes.png", dpi=300, bbox_inches="tight")
     print("✓ Saved: outputs/classification_outcomes.png")
     plt.close(fig)
 
@@ -399,7 +457,6 @@ if __name__ == "__main__":
     smoke_ok = quick_smoke_test()
     print()
     overall_stats = test_by_attack_type()
-    
+
     # Generate confusion matrix visualizations
     create_confusion_matrix_visualizations(overall_stats)
-

@@ -38,7 +38,6 @@ After training run:
 
 import argparse
 import os
-import sys
 from pathlib import Path
 
 # ─────────────────────────────────────────────────────────────────
@@ -50,17 +49,18 @@ from anomaly_model import train_model as train_iforest
 # STEP 9 — Clustering training
 # ─────────────────────────────────────────────────────────────────
 from cluster_attackers import (
+    build_profile_report,
     load_cicids_data,
     prepare_features,
-    run_kmeans,
     run_dbscan,
-    build_profile_report,
+    run_kmeans,
+)
+from cluster_attackers import (
     save_models as save_cluster_models,
 )
 
-
-DATA_DIR    = "data"
-MODELS_DIR  = "models"
+DATA_DIR = "data"
+MODELS_DIR = "models"
 OUTPUTS_DIR = "outputs"
 
 STEP8_TRAINING_FILES = [
@@ -124,23 +124,34 @@ def run_step9(n_clusters: int, max_rows: int, dbscan_eps: float):
     db_model, db_labels, db_score, pca = run_dbscan(X_scaled, eps=dbscan_eps)
 
     report, result_df, profiles = build_profile_report(
-        df, km_labels, db_labels, km_model,
-        feature_names, true_labels, OUTPUTS_DIR,
+        df,
+        km_labels,
+        db_labels,
+        km_model,
+        feature_names,
+        true_labels,
+        OUTPUTS_DIR,
     )
 
     save_cluster_models(km_model, db_model, scaler, pca, profiles, MODELS_DIR)
 
     print("\nStep 9 artifacts:")
-    for f in ["kmeans_model.pkl", "dbscan_model.pkl", "cluster_scaler.pkl",
-              "pca.pkl", "profile_map.pkl"]:
+    for f in [
+        "kmeans_model.pkl",
+        "dbscan_model.pkl",
+        "cluster_scaler.pkl",
+        "pca.pkl",
+        "profile_map.pkl",
+    ]:
         path = os.path.join(MODELS_DIR, f)
         status = "[OK]" if os.path.exists(path) else "[MISSING]"
         print(f"  {status}  models/{f}")
 
     print("\nAttacker profiles discovered:")
     for cid, info in report["kmeans_profiles"].items():
-        print(f"  Cluster {cid} → {info['profile']:20s}  "
-              f"{info['size']:>7,} flows  ({info['pct']}%)")
+        print(
+            f"  Cluster {cid} → {info['profile']:20s}  {info['size']:>7,} flows  ({info['pct']}%)"
+        )
 
     return True
 
@@ -148,11 +159,11 @@ def run_step9(n_clusters: int, max_rows: int, dbscan_eps: float):
 # ── Main ──────────────────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser(description="Train Step 8 + Step 9 models")
-    parser.add_argument("--clusters",   type=int,   default=4,      help="K-Means clusters (default 4)")
-    parser.add_argument("--max-rows",   type=int,   default=200_000, help="Max rows for clustering")
-    parser.add_argument("--dbscan-eps", type=float, default=0.8,    help="DBSCAN epsilon")
-    parser.add_argument("--skip-step8", action="store_true",         help="Skip Isolation Forest training")
-    parser.add_argument("--skip-step9", action="store_true",         help="Skip clustering training")
+    parser.add_argument("--clusters", type=int, default=4, help="K-Means clusters (default 4)")
+    parser.add_argument("--max-rows", type=int, default=200_000, help="Max rows for clustering")
+    parser.add_argument("--dbscan-eps", type=float, default=0.8, help="DBSCAN epsilon")
+    parser.add_argument("--skip-step8", action="store_true", help="Skip Isolation Forest training")
+    parser.add_argument("--skip-step9", action="store_true", help="Skip clustering training")
     args = parser.parse_args()
 
     Path(DATA_DIR).mkdir(exist_ok=True)

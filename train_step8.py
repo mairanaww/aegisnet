@@ -1,10 +1,10 @@
 """
-AEGIS Step 8 — Train Script  
+AEGIS Step 8 — Train Script
 Run this ONCE to train and save the Isolation Forest model.
 
 Uses ONLY Monday (pure 100% BENIGN baseline):
   - Monday-WorkingHours.pcap_ISCX.csv (529,918 rows - 100% BENIGN)
-  
+
 This ultra-clean training data maximizes attack detection capacity.
 
 Usage:
@@ -14,7 +14,7 @@ Usage:
 
 import os
 import sys
-import pandas as pd
+
 from anomaly_model import train_model
 
 DATA_DIR = "data"
@@ -54,4 +54,3 @@ if __name__ == "__main__":
     print("  models/scaler.pkl")
     print("  models/feature_columns.pkl")
     print("  data/normal_traffic.csv")
-

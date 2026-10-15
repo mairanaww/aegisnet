@@ -1,7 +1,7 @@
 """Quick smoke test to verify scoring is correct."""
-import numpy as np
-import pandas as pd
+
 import joblib
+
 from anomaly_model import score_session
 
 feature_cols = joblib.load("models/feature_columns.pkl")
@@ -11,9 +11,9 @@ print("SMOKE TEST — synthetic feature vectors")
 print("=" * 70)
 
 # All-zero vector → should look normal
-normal_fv  = {col: 0.0 for col in feature_cols}
+normal_fv = {col: 0.0 for col in feature_cols}
 # Large values → should look anomalous
-attack_fv  = {col: 1e6 for col in feature_cols}
+attack_fv = {col: 1e6 for col in feature_cols}
 
 score_normal = score_session(normal_fv)
 score_attack = score_session(attack_fv)

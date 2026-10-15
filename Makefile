@@ -1,4 +1,5 @@
 .DEFAULT_GOAL := help
+PYTHON ?= python3
 
 .PHONY: help install train serve test test-cov lint format docker-build docker-up docker-down clean smoke retrain retrain-dry all
 
@@ -22,25 +23,25 @@ help:
 	@echo "  all          Run install, train, and test sequentially"
 
 install:
-	pip install -r requirements.txt && pip install fastapi uvicorn[standard] pydantic httpx pytest pytest-cov ruff
+	$(PYTHON) -m pip install -r requirements.txt
 
 train:
-	python train_all.py
+	$(PYTHON) train_all.py
 
 serve:
-	uvicorn api.main:app --reload --port 8000
+	$(PYTHON) -m uvicorn api.main:app --reload --port 8000
 
 test:
-	pytest tests/ -v --tb=short
+	$(PYTHON) -m pytest tests/ -v --tb=short
 
 test-cov:
-	pytest tests/ -v --cov=. --cov-report=term-missing --cov-report=html
+	$(PYTHON) -m pytest tests/ -v --cov=. --cov-report=term-missing --cov-report=html
 
 lint:
-	ruff check . && ruff format --check .
+	$(PYTHON) -m ruff check . && $(PYTHON) -m ruff format --check .
 
 format:
-	ruff format . && ruff check --fix .
+	$(PYTHON) -m ruff format . && $(PYTHON) -m ruff check --fix .
 
 docker-build:
 	docker compose build
@@ -55,12 +56,12 @@ clean:
 	rm -rf models/*.pkl outputs/*.csv outputs/*.json logs/*.log logs/*.jsonl __pycache__ .pytest_cache .ruff_cache htmlcov
 
 smoke:
-	python ai_engine.py
+	$(PYTHON) ai_engine.py
 
 retrain:
-	python retrain.py
+	$(PYTHON) retrain.py
 
 retrain-dry:
-	python retrain.py --dry-run
+	$(PYTHON) retrain.py --dry-run
 
 all: install train test
