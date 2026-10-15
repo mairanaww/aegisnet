@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  aegisnet-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aegisnet-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped

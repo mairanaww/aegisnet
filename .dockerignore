@@ -1,0 +1,34 @@
+# Byte-compiled / optimized / DLL files
+__pycache__
+*.py[cod]
+*$py.class
+
+# Git
+.git
+.gitignore
+.github
+
+# Virtual Environments
+.venv
+venv
+ENV/
+env/
+
+# Testing and Linters
+.ruff_cache
+.pytest_cache
+htmlcov
+.coverage
+.coverage.*
+
+# Large training data files
+data/*.csv
+
+# Packaging
+*.egg-info
+dist/
+build/
+
+# Environment files
+.env
+.env.*
