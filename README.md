@@ -91,7 +91,7 @@ source .venv/bin/activate
 make install
 ```
 
-On macOS, use `python3` rather than `python` before activating the virtual environment. If `python3` is missing, install Python 3.11 or newer first. On Windows, activate with `.venv\\Scripts\\activate` and run `make PYTHON=python` if Make is installed.
+On macOS, use `python3` rather than `python` before activating the virtual environment. If `python3` is missing, install Python 3.11 or newer first. On Windows, activate with `.venv\Scripts\activate` and run `make PYTHON=python` if Make is installed.
 
 ### 2. Dataset Setup
 Download the [CICIDS-2017 MachineLearningCVE](https://www.unb.ca/cic/datasets/ids-2017.html) CSV files and place them into the `data/` directory:
