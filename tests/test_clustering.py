@@ -10,8 +10,8 @@ import pytest
 
 from cluster_attackers import (
     assign_profile_names_from_centroids,
-    run_kmeans,
     run_dbscan,
+    run_kmeans,
 )
 
 EXPECTED_PROFILES = {"Scanner", "Automated Bot", "Human Attacker", "Insider-like"}

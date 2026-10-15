@@ -25,7 +25,6 @@ NOTE (combined package):
 import argparse
 import json
 import logging
-import os
 import warnings
 from pathlib import Path
 
@@ -35,7 +34,7 @@ import pandas as pd
 from sklearn.cluster import DBSCAN, KMeans
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score
-from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.preprocessing import StandardScaler
 
 warnings.filterwarnings("ignore")
 
@@ -126,10 +125,20 @@ BEHAVIORAL_FEATURES = [
 LABEL_COL = " Label"
 
 ATTACK_CLASSES = [
-    "DoS Hulk", "PortScan", "DDoS", "DoS GoldenEye",
-    "FTP-Patator", "SSH-Patator", "DoS slowloris", "DoS Slowhttptest",
-    "Bot", "Web Attack  Brute Force", "Web Attack  XSS",
-    "Infiltration", "Web Attack  Sql Injection", "Heartbleed",
+    "DoS Hulk",
+    "PortScan",
+    "DDoS",
+    "DoS GoldenEye",
+    "FTP-Patator",
+    "SSH-Patator",
+    "DoS slowloris",
+    "DoS Slowhttptest",
+    "Bot",
+    "Web Attack  Brute Force",
+    "Web Attack  XSS",
+    "Infiltration",
+    "Web Attack  Sql Injection",
+    "Heartbleed",
 ]
 
 
@@ -148,12 +157,12 @@ def assign_profile_names_from_centroids(centers: np.ndarray, feature_names: list
             return np.zeros(n)
         return centers[:, idx]
 
-    pkt_rate  = col("Flow Packets/s")
-    syn       = col("SYN Flag Count")
-    flow_dur  = col("Flow Duration")
-    pkt_var   = col("Packet Length Variance")
-    ack       = col("ACK Flag Count")
-    bwd_pkts  = col("Total Backward Packets")
+    pkt_rate = col("Flow Packets/s")
+    syn = col("SYN Flag Count")
+    flow_dur = col("Flow Duration")
+    pkt_var = col("Packet Length Variance")
+    ack = col("ACK Flag Count")
+    bwd_pkts = col("Total Backward Packets")
 
     def rank(arr):
         order = np.argsort(arr)
@@ -162,16 +171,16 @@ def assign_profile_names_from_centroids(centers: np.ndarray, feature_names: list
         return r
 
     r_pkt_rate = rank(pkt_rate)
-    r_syn      = rank(syn)
-    r_dur      = rank(flow_dur)
-    r_var      = rank(pkt_var)
-    r_ack      = rank(ack)
-    r_bwd      = rank(bwd_pkts)
+    r_syn = rank(syn)
+    r_dur = rank(flow_dur)
+    r_var = rank(pkt_var)
+    r_ack = rank(ack)
+    r_bwd = rank(bwd_pkts)
 
-    scanner_score  = r_pkt_rate + r_syn + (n - 1 - r_dur)
-    bot_score      = r_pkt_rate + r_ack + (n - 1 - r_var)
-    human_score    = r_var + r_dur + r_bwd
-    insider_score  = r_dur + (n - 1 - r_pkt_rate) + r_bwd
+    scanner_score = r_pkt_rate + r_syn + (n - 1 - r_dur)
+    bot_score = r_pkt_rate + r_ack + (n - 1 - r_var)
+    human_score = r_var + r_dur + r_bwd
+    insider_score = r_dur + (n - 1 - r_pkt_rate) + r_bwd
 
     scores = np.stack([scanner_score, bot_score, human_score, insider_score], axis=1)
     profile_names = ["Scanner", "Automated Bot", "Human Attacker", "Insider-like"]
@@ -255,8 +264,6 @@ def prepare_features(df: pd.DataFrame) -> tuple:
     Selects, cleans, and scales behavioral features.
     Returns: (scaled_array, feature_names_used, labels_series_or_None, scaler)
     """
-    available = [c for c in BEHAVIORAL_FEATURES if c in df.columns or c.strip() in df.columns]
-
     col_map = {c.strip(): c for c in df.columns}
     resolved = []
 
@@ -319,8 +326,9 @@ def run_dbscan(X: np.ndarray, eps: float = 0.8, min_samples: int = 10) -> tuple:
     if n_clusters >= 2:
         mask = labels != -1
         if mask.sum() > 1000:
-            score = silhouette_score(X_pca[mask], labels[mask],
-                                     sample_size=min(10_000, mask.sum()), random_state=42)
+            score = silhouette_score(
+                X_pca[mask], labels[mask], sample_size=min(10_000, mask.sum()), random_state=42
+            )
             log.info(f"DBSCAN silhouette score (excluding noise): {score:.4f}")
 
     return db, labels, score, pca
@@ -364,7 +372,7 @@ def build_profile_report(
             top_attacks = {str(k): int(v) for k, v in top_attacks.items()}
             entry["top_attack_types"] = top_attacks
         report["kmeans_profiles"][str(cid)] = entry
-        log.info(f"  Cluster {cid} → '{name}': {mask.sum():,} flows ({mask.mean()*100:.1f}%)")
+        log.info(f"  Cluster {cid} → '{name}': {mask.sum():,} flows ({mask.mean() * 100:.1f}%)")
 
     n_db_clusters = len(set(db_labels)) - (1 if -1 in db_labels else 0)
     report["dbscan_summary"] = {
@@ -393,13 +401,15 @@ def save_models(km_model, db_model, scaler, pca, profile_map: dict, output_dir: 
     can return real names at inference time.
     """
     output_dir = Path(output_dir)
-    joblib.dump(km_model,    output_dir / "kmeans_model.pkl")
-    joblib.dump(db_model,    output_dir / "dbscan_model.pkl")
-    joblib.dump(scaler,      output_dir / "cluster_scaler.pkl")   # ← renamed
-    joblib.dump(pca,         output_dir / "pca.pkl")
-    joblib.dump(profile_map, output_dir / "profile_map.pkl")       # ← new
+    joblib.dump(km_model, output_dir / "kmeans_model.pkl")
+    joblib.dump(db_model, output_dir / "dbscan_model.pkl")
+    joblib.dump(scaler, output_dir / "cluster_scaler.pkl")  # ← renamed
+    joblib.dump(pca, output_dir / "pca.pkl")
+    joblib.dump(profile_map, output_dir / "profile_map.pkl")  # ← new
     log.info("Step 9 models saved to models/")
-    log.info("  kmeans_model.pkl | dbscan_model.pkl | cluster_scaler.pkl | pca.pkl | profile_map.pkl")
+    log.info(
+        "  kmeans_model.pkl | dbscan_model.pkl | cluster_scaler.pkl | pca.pkl | profile_map.pkl"
+    )
 
 
 # ── Inference (predict on new flow) ──────────────────────────────────────────
@@ -415,13 +425,13 @@ def predict_profile(flow_features: dict, models_dir: str = "models") -> dict:
     """
     models_dir = Path(models_dir)
 
-    scaler      = joblib.load(models_dir / "cluster_scaler.pkl")   # ← renamed
-    km_model    = joblib.load(models_dir / "kmeans_model.pkl")
-    profile_map = joblib.load(models_dir / "profile_map.pkl")       # ← load saved map
+    scaler = joblib.load(models_dir / "cluster_scaler.pkl")  # ← renamed
+    km_model = joblib.load(models_dir / "kmeans_model.pkl")
+    profile_map = joblib.load(models_dir / "profile_map.pkl")  # ← load saved map
 
-    feat_vec    = np.array([[flow_features.get(f, 0) for f in BEHAVIORAL_FEATURES]])
+    feat_vec = np.array([[flow_features.get(f, 0) for f in BEHAVIORAL_FEATURES]])
     feat_scaled = scaler.transform(feat_vec)
-    cluster_id  = int(km_model.predict(feat_scaled)[0])
+    cluster_id = int(km_model.predict(feat_scaled)[0])
 
     # Use the saved profile map — NOT the broken single-cluster wrapper
     profile = profile_map.get(cluster_id, f"Cluster-{cluster_id}")
@@ -432,11 +442,11 @@ def predict_profile(flow_features: dict, models_dir: str = "models") -> dict:
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser(description="Step 9: Attacker Behavior Clustering")
-    parser.add_argument("--data",       default="data/",    help="Directory with CSVs")
-    parser.add_argument("--output",     default="outputs/", help="Directory for results")
-    parser.add_argument("--models",     default="models/",  help="Directory to save models")
-    parser.add_argument("--clusters",   type=int, default=4)
-    parser.add_argument("--max-rows",   type=int, default=200_000)
+    parser.add_argument("--data", default="data/", help="Directory with CSVs")
+    parser.add_argument("--output", default="outputs/", help="Directory for results")
+    parser.add_argument("--models", default="models/", help="Directory to save models")
+    parser.add_argument("--clusters", type=int, default=4)
+    parser.add_argument("--max-rows", type=int, default=200_000)
     parser.add_argument("--dbscan-eps", type=float, default=0.8)
     args = parser.parse_args()
 
@@ -448,7 +458,7 @@ def main():
     log.info("STEP 9: Attacker Behavior Clustering")
     log.info("=" * 60)
 
-    df          = load_cicids_data(args.data, max_rows=args.max_rows)
+    df = load_cicids_data(args.data, max_rows=args.max_rows)
     X_scaled, feature_names, true_labels, scaler = prepare_features(df)
     log.info(f"Feature matrix shape: {X_scaled.shape}")
 
@@ -456,8 +466,7 @@ def main():
     db_model, db_labels, db_score, pca = run_dbscan(X_scaled, eps=args.dbscan_eps)
 
     report, result_df, profiles = build_profile_report(
-        df, km_labels, db_labels, km_model,
-        feature_names, true_labels, args.output
+        df, km_labels, db_labels, km_model, feature_names, true_labels, args.output
     )
 
     save_models(km_model, db_model, scaler, pca, profiles, args.models)
@@ -471,8 +480,10 @@ def main():
             for attack, cnt in list(info["top_attack_types"].items())[:3]:
                 log.info(f"      ↳ {attack}: {cnt:,}")
 
-    log.info(f"\nDBSCAN: {report['dbscan_summary']['n_clusters']} clusters, "
-             f"{report['dbscan_summary']['noise_points']:,} noise points")
+    log.info(
+        f"\nDBSCAN: {report['dbscan_summary']['n_clusters']} clusters, "
+        f"{report['dbscan_summary']['noise_points']:,} noise points"
+    )
     log.info(f"\nOutputs saved to: {args.output}")
     log.info(f"Models  saved to: {args.models}")
 

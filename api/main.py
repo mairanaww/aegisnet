@@ -7,14 +7,8 @@ flow analysis, behavior clustering, risk scoring, model retraining, and configur
 import json
 import logging
 import os
-import sys
 import time
-from typing import Any, Dict, List, Union
-
-# Ensure project root is available in sys.path
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
+from typing import Any
 
 from fastapi import Body, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,6 +24,8 @@ from api.models import (
     RetrainRequest,
     RetrainResponse,
 )
+
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 # ── Logging setup ────────────────────────────────────────────────────────────
 os.makedirs(os.path.join(PROJECT_ROOT, "logs"), exist_ok=True)
@@ -65,7 +61,7 @@ def check_models_exist() -> bool:
     return all(os.path.exists(path) for path in REQUIRED_MODEL_FILES)
 
 
-def get_missing_models() -> List[str]:
+def get_missing_models() -> list[str]:
     """Return a list of missing model file names."""
     return [os.path.basename(path) for path in REQUIRED_MODEL_FILES if not os.path.exists(path)]
 
@@ -103,6 +99,7 @@ async def startup_event() -> None:
         logger.info("All required AegisNet model artifacts are present on disk.")
         try:
             import anomaly_model
+
             anomaly_model._load_artifacts()
             logger.info("Model artifacts loaded successfully into cache.")
         except Exception as exc:
@@ -210,7 +207,7 @@ async def analyze(flow: FlowFeatures) -> AnalysisResponse:
     },
 )
 async def analyze_batch(
-    batch: Union[BatchAnalysisRequest, List[FlowFeatures]] = Body(...)
+    batch: BatchAnalysisRequest | list[FlowFeatures] = Body(...),
 ) -> BatchAnalysisResponse:
     """
     Analyze multiple network flows in a single batch request and return timing.
@@ -228,7 +225,7 @@ async def analyze_batch(
         )
 
     start_time = time.perf_counter()
-    results: List[AnalysisResponse] = []
+    results: list[AnalysisResponse] = []
 
     try:
         from ai_engine import analyze_session
@@ -275,7 +272,7 @@ async def retrain(request: RetrainRequest = RetrainRequest()) -> RetrainResponse
     - Validates against benign baselines before swapping models.
     """
     try:
-        from retrain import retrain_cycle, RETRAIN_METRICS
+        from retrain import RETRAIN_METRICS, retrain_cycle
 
         success = retrain_cycle(
             dry_run=request.dry_run,
@@ -285,7 +282,7 @@ async def retrain(request: RetrainRequest = RetrainRequest()) -> RetrainResponse
         metrics = None
         if os.path.exists(RETRAIN_METRICS):
             try:
-                with open(RETRAIN_METRICS, "r") as f:
+                with open(RETRAIN_METRICS) as f:
                     lines = [line.strip() for line in f if line.strip()]
                     if lines:
                         metrics = json.loads(lines[-1])
@@ -325,7 +322,7 @@ async def retrain(request: RetrainRequest = RetrainRequest()) -> RetrainResponse
         500: {"model": ErrorResponse, "description": "Error reading configuration"},
     },
 )
-async def get_config() -> Dict[str, Any]:
+async def get_config() -> dict[str, Any]:
     """
     Retrieve contents of risk_scorer_config.json.
     """
@@ -336,7 +333,7 @@ async def get_config() -> Dict[str, Any]:
         )
 
     try:
-        with open(CONFIG_PATH, "r") as f:
+        with open(CONFIG_PATH) as f:
             data = json.load(f)
         return data
     except Exception as exc:
@@ -357,7 +354,7 @@ async def get_config() -> Dict[str, Any]:
         500: {"model": ErrorResponse, "description": "Error updating configuration"},
     },
 )
-async def update_config(new_config: Dict[str, Any] = Body(...)) -> Dict[str, Any]:
+async def update_config(new_config: dict[str, Any] = Body(...)) -> dict[str, Any]:
     """
     Accept a new configuration dictionary, write it to risk_scorer_config.json,
     and reload the risk_scorer module configuration in-memory.
@@ -375,6 +372,7 @@ async def update_config(new_config: Dict[str, Any] = Body(...)) -> Dict[str, Any
         # Reload configuration in risk_scorer module
         try:
             import risk_scorer
+
             risk_scorer.CONFIG = risk_scorer._load_config()
             logger.info("risk_scorer module configuration reloaded successfully.")
         except Exception as e:

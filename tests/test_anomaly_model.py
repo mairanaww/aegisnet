@@ -6,15 +6,16 @@ DataFrame cleaning, and inference scoring with Isolation Forest.
 """
 
 import os
+
 import numpy as np
 import pandas as pd
 import pytest
 
 from anomaly_model import (
-    _raw_to_score,
     _classify_risk,
-    _signed_log1p,
     _clean_df,
+    _raw_to_score,
+    _signed_log1p,
     score_session,
 )
 
@@ -85,10 +86,12 @@ def test_signed_log1p_zero():
 
 def test_clean_df_handles_inf():
     """Verify DataFrame with positive and negative infinity is sanitized to 0.0."""
-    df = pd.DataFrame({
-        "feat1": [1.0, np.inf, -np.inf, 4.0],
-        "feat2": [5.0, 6.0, 7.0, 8.0],
-    })
+    df = pd.DataFrame(
+        {
+            "feat1": [1.0, np.inf, -np.inf, 4.0],
+            "feat2": [5.0, 6.0, 7.0, 8.0],
+        }
+    )
     cleaned = _clean_df(df, ["feat1", "feat2"])
     assert not np.isinf(cleaned).any()
     assert not np.isnan(cleaned).any()
@@ -98,10 +101,12 @@ def test_clean_df_handles_inf():
 
 def test_clean_df_handles_nan():
     """Verify DataFrame with NaN values gets filled with 0.0."""
-    df = pd.DataFrame({
-        "feat1": [1.0, np.nan, 3.0],
-        "feat2": [np.nan, 5.0, 6.0],
-    })
+    df = pd.DataFrame(
+        {
+            "feat1": [1.0, np.nan, 3.0],
+            "feat2": [np.nan, 5.0, 6.0],
+        }
+    )
     cleaned = _clean_df(df, ["feat1", "feat2"])
     assert not np.isnan(cleaned).any()
     assert cleaned[1, 0] == 0.0

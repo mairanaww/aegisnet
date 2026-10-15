@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
-AegisNet is an enterprise-grade, autonomous network intrusion detection and adaptive response engine engineered to defend high-throughput infrastructure against advanced persistent threats and zero-day exploits. Traditional signature-based detection systems suffer from brittle rule sets and suffocating alert fatigue; AegisNet replaces heuristic fragility with a high-performance three-stage machine learning pipeline combining semi-supervised anomaly detection, behavioral attacker profiling, and configurable multi-signal risk fusion. By transforming raw flow metrics into deterministic threat bands and contextual honeypot containment policies at wire speed—while continuously adapting via an automated zero-downtime feedback loop—AegisNet delivers proactive, self-healing cyber defense backed by empirical validation on the Canadian Institute for Cybersecurity (CICIDS-2017) benchmark.
+AegisNet is a Python project for analyzing network flow records. It trains an Isolation Forest for anomaly scoring, groups suspicious flows with K-Means, and combines those signals into a risk score through a FastAPI service. Training requires the CICIDS-2017 CSV files; the repository does not include the dataset or trained models. The API can start without them, but analysis returns HTTP 503 until training is complete. The project does not capture live packets or enforce network policies.
 
 ---
 
@@ -86,8 +86,12 @@ flowchart TD
 ### 1. Clone & Install
 ```bash
 git clone https://github.com/mairanaww/aegisnet.git && cd aegisnet
+python3 -m venv .venv
+source .venv/bin/activate
 make install
 ```
+
+On macOS, use `python3` rather than `python` before activating the virtual environment. If `python3` is missing, install Python 3.11 or newer first. On Windows, activate with `.venv\Scripts\activate` and run `make PYTHON=python` if Make is installed.
 
 ### 2. Dataset Setup
 Download the [CICIDS-2017 MachineLearningCVE](https://www.unb.ca/cic/datasets/ids-2017.html) CSV files and place them into the `data/` directory:
@@ -108,6 +112,8 @@ Run the unified training pipeline to train both the anomaly detection and cluste
 ```bash
 make train
 ```
+
+Training needs the CSV files listed above and may take time. Starting the API without them is useful for checking `/health` and `/docs`, but `/analyze` cannot score flows until the model files exist. `demo_synthetic.py` generates sample records for exploring the clustering code; those records are not a substitute for the real training dataset or an evaluation of detection quality.
 
 ### 4. Launch API Service
 Start the FastAPI service locally with auto-reload:
@@ -132,23 +138,21 @@ Analyzes a single network flow session in real time.
 curl -X POST http://localhost:8000/analyze \
   -H "Content-Type: application/json" \
   -d '{
-    "flow_features": {
-      " Flow Duration": 12500,
-      " Total Fwd Packets": 12,
-      " Total Backward Packets": 8,
-      "Total Length of Fwd Packets": 2400,
-      " Total Length of Bwd Packets": 1150,
-      " Fwd Packet Length Mean": 200.0,
-      " Bwd Packet Length Mean": 143.75,
-      " Flow Bytes/s": 284000.0,
-      " Flow Packets/s": 1600.0,
-      " Flow IAT Mean": 625.0,
-      " SYN Flag Count": 6,
-      " ACK Flag Count": 8,
-      " PSH Flag Count": 4,
-      " FIN Flag Count": 0,
-      " RST Flag Count": 0
-    }
+    "flow_duration": 12500,
+    "total_fwd_packets": 12,
+    "total_backward_packets": 8,
+    "total_length_fwd_packets": 2400,
+    "total_length_bwd_packets": 1150,
+    "fwd_packet_length_mean": 200.0,
+    "bwd_packet_length_mean": 143.75,
+    "flow_bytes_per_sec": 284000.0,
+    "flow_packets_per_sec": 1600.0,
+    "flow_iat_mean": 625.0,
+    "syn_flag_count": 6,
+    "ack_flag_count": 8,
+    "psh_flag_count": 4,
+    "fin_flag_count": 0,
+    "rst_flag_count": 0
   }'
 ```
 

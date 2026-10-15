@@ -1,8 +1,10 @@
 """Analyze thresholds to find best precision."""
-import pandas as pd
-import numpy as np
+
 import joblib
-from anomaly_model import score_session, FEATURES_PATH
+import numpy as np
+import pandas as pd
+
+from anomaly_model import FEATURES_PATH, score_session
 
 TEST_FILES = [
     ("data/Tuesday-WorkingHours.pcap_ISCX.csv", "Brute Force"),
@@ -68,30 +70,39 @@ for threshold in np.arange(0.0, 1.01, 0.05):
     fp = np.sum(benign_scores >= threshold)
     fn = len(attack_scores) - tp
     tn = len(benign_scores) - fp
-    
+
     if tp + fp > 0:
         precision = tp / (tp + fp)
     else:
         precision = 0
-    
+
     if tp + fn > 0:
         recall = tp / (tp + fn)
     else:
         recall = 0
-    
+
     if precision + recall > 0:
         f1 = 2 * (precision * recall) / (precision + recall)
     else:
         f1 = 0
-    
+
     marker = ""
     if precision >= 0.80:
         marker = " <-- P>=80%"
         if best_precision is None or recall > best_config["recall"]:
             best_precision = precision
-            best_config = {"t": threshold, "precision": precision, "recall": recall, "f1": f1, "tp": tp, "fp": fp}
-    
-    print(f"  {threshold:.2f}   | {tp:4d} | {fp:4d} | {fn:4d} | {tn:4d} | {precision:8.1%} | {recall:6.1%} | {f1:.3f}{marker}")
+            best_config = {
+                "t": threshold,
+                "precision": precision,
+                "recall": recall,
+                "f1": f1,
+                "tp": tp,
+                "fp": fp,
+            }
+
+    print(
+        f"  {threshold:.2f}   | {tp:4d} | {fp:4d} | {fn:4d} | {tn:4d} | {precision:8.1%} | {recall:6.1%} | {f1:.3f}{marker}"
+    )
 
 if best_config:
     print("\n" + "=" * 70)
@@ -106,7 +117,7 @@ else:
     print("\n" + "=" * 70)
     print("NO CONFIGURATION ACHIEVES 80% PRECISION")
     print("=" * 70)
-    
+
     # Find best F1 instead
     best_f1 = 0
     best_f1_config = None
@@ -114,27 +125,34 @@ else:
         tp = np.sum(attack_scores >= threshold)
         fp = np.sum(benign_scores >= threshold)
         fn = len(attack_scores) - tp
-        
+
         if tp + fp > 0:
             precision = tp / (tp + fp)
         else:
             precision = 0
-        
+
         if tp + fn > 0:
             recall = tp / (tp + fn)
         else:
             recall = 0
-        
+
         if precision + recall > 0:
             f1 = 2 * (precision * recall) / (precision + recall)
         else:
             f1 = 0
-        
+
         if f1 > best_f1:
             best_f1 = f1
-            best_f1_config = {"t": threshold, "precision": precision, "recall": recall, "f1": f1, "tp": tp, "fp": fp}
-    
-    print(f"\nBest F1 Score instead:")
+            best_f1_config = {
+                "t": threshold,
+                "precision": precision,
+                "recall": recall,
+                "f1": f1,
+                "tp": tp,
+                "fp": fp,
+            }
+
+    print("\nBest F1 Score instead:")
     print(f"Threshold: {best_f1_config['t']:.2f}")
     print(f"Precision: {best_f1_config['precision']:.1%}")
     print(f"Recall:    {best_f1_config['recall']:.1%}")

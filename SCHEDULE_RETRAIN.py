@@ -1,4 +1,4 @@
-"""
+r"""
 AEGIS Step 17 — Scheduling Retrain Cycles
 
 This guide shows how to set up automatic retraining on Windows and Linux.
@@ -11,7 +11,7 @@ Option 1: Using PowerShell (Easiest)
 ------------------------------------
 
 1. Open PowerShell as Administrator
-   
+
 2. Copy-paste this command:
 
    $TaskPath = "AEGIS"
@@ -19,22 +19,22 @@ Option 1: Using PowerShell (Easiest)
    $ScriptPath = "C:\Users\Disha\step8_9_ai_engine\retrain.py"
    $PythonExe = "C:\Users\Disha\AppData\Local\Programs\Python\Python313\python.exe"
    $WorkDir = "C:\Users\Disha\step8_9_ai_engine"
-   
+
    # Create task trigger: every day at 2:00 AM
    $Trigger = New-ScheduledTaskTrigger -Daily -At 2:00AM
-   
+
    # Create task action: run Python script
    $Action = New-ScheduledTaskAction -Execute $PythonExe -Argument $ScriptPath -WorkingDirectory $WorkDir
-   
+
    # Create task with high privilege
    Register-ScheduledTask -TaskPath $TaskPath -TaskName $TaskName -Trigger $Trigger -Action $Action -RunLevel Highest
-   
+
    Write-Host "✓ Task scheduled: AEGIS\Retrain-Daily at 2:00 AM daily"
 
 3. Verify: Task Scheduler > Task Scheduler Library > AEGIS > Retrain-Daily
 
 4. To remove the task later:
-   
+
    Unregister-ScheduledTask -TaskPath "AEGIS" -TaskName "Retrain-Daily" -Confirm:$false
 
 
@@ -99,7 +99,7 @@ Or run every 6 hours:
    0 0,6,12,18 * * * cd /home/user/step8_9_ai_engine && /usr/bin/python3 retrain.py >> logs/cron_retrain.log 2>&1
 
 Verify cron is working:
-   
+
    crontab -l   # List your cron jobs
    grep CRON /var/log/syslog   # Check system cron logs
 
@@ -233,7 +233,7 @@ For critical systems:
 # Auto-setup script for Windows users
 if __name__ == "__main__":
     import platform
-    
+
     if platform.system() == "Windows":
         print(__doc__)
         print("\nTo set up automatic daily retrains, copy-paste the PowerShell command above.")

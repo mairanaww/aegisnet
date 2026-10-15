@@ -10,6 +10,7 @@ Validates endpoints:
 """
 
 import os
+
 import pytest
 
 # Ensure fastapi and httpx dependencies are available; skip if not installed
@@ -18,6 +19,7 @@ httpx = pytest.importorskip("httpx")
 
 try:
     from fastapi.testclient import TestClient
+
     from api.main import app
 except Exception:
     app = None
@@ -48,9 +50,8 @@ def test_analyze_endpoint_without_models(client, sample_flow_features):
     POST /analyze returns 503 Service Unavailable when ML model artifacts
     are not present, or 200 OK if trained models are present.
     """
-    models_trained = (
-        os.path.exists("models/isolation_forest.pkl")
-        and os.path.exists("models/kmeans_model.pkl")
+    models_trained = os.path.exists("models/isolation_forest.pkl") and os.path.exists(
+        "models/kmeans_model.pkl"
     )
 
     response = client.post("/analyze", json={})
@@ -76,6 +77,21 @@ def test_analyze_batch_endpoint(client):
         response = client.post("/analyze/batch", json={"items": []})
 
     assert response.status_code == 200
+
+
+def test_documented_analyze_request_matches_schema(client):
+    """The README example reaches inference rather than failing request validation."""
+    flow = {
+        "flow_duration": 12500,
+        "total_fwd_packets": 12,
+        "total_backward_packets": 8,
+        "total_length_fwd_packets": 2400,
+        "total_length_bwd_packets": 1150,
+    }
+    response = client.post("/analyze", json=flow)
+    assert response.status_code != 422
+    if not os.path.exists("models/isolation_forest.pkl"):
+        assert response.status_code == 503
 
 
 def test_config_endpoint(client):

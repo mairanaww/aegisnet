@@ -6,11 +6,12 @@ Validates threshold classification, feature extraction heuristics
 """
 
 import pytest
+
 from risk_scorer import (
-    compute_risk,
     _classify_risk,
-    _extract_privilege_escalation_score,
     _extract_lateral_movement_score,
+    _extract_privilege_escalation_score,
+    compute_risk,
 )
 
 

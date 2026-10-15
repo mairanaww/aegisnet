@@ -35,13 +35,13 @@ import os
 from datetime import datetime
 
 # ── Step 8 import ──────────────────────────────────────────────────
-from anomaly_model import score_session          # → float in [0, 1]
+from anomaly_model import score_session  # → float in [0, 1]
 
 # ── Step 9 import ──────────────────────────────────────────────────
-from cluster_attackers import predict_profile    # → {"cluster_id", "attacker_profile"}
+from cluster_attackers import predict_profile  # → {"cluster_id", "attacker_profile"}
 
 # ── Step 10 import ─────────────────────────────────────────────────
-from risk_scorer import compute_risk             # → unified risk score + level
+from risk_scorer import compute_risk  # → unified risk score + level
 
 # ── Logging ────────────────────────────────────────────────────────
 os.makedirs("logs", exist_ok=True)
@@ -59,6 +59,7 @@ logger = logging.getLogger(__name__)
 # ══════════════════════════════════════════════════════════════════════════════
 # RISK BAND MAPPING
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _risk_band(score: float) -> str:
     """
@@ -80,6 +81,7 @@ def _risk_band(score: float) -> str:
 # ══════════════════════════════════════════════════════════════════════════════
 # PUBLIC API
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def analyze_session(feature_vector) -> dict:
     """
@@ -140,9 +142,9 @@ def analyze_session(feature_vector) -> dict:
     # predict_profile expects a dict; convert if needed
     if not isinstance(feature_vector, dict):
         try:
-            import pandas as pd
-            import numpy as np
             import joblib
+            import pandas as pd
+
             feature_cols = joblib.load("models/feature_columns.pkl")
             if isinstance(feature_vector, pd.Series):
                 fv_dict = feature_vector.to_dict()
@@ -154,9 +156,9 @@ def analyze_session(feature_vector) -> dict:
     else:
         fv_dict = feature_vector
 
-    cluster_result   = predict_profile(fv_dict, models_dir="models")
+    cluster_result = predict_profile(fv_dict, models_dir="models")
     attacker_profile = cluster_result["attacker_profile"]
-    cluster_id       = cluster_result["cluster_id"]
+    cluster_id = cluster_result["cluster_id"]
 
     # ── Step 10: Risk Scoring ──────────────────────────────────────
     risk_result = compute_risk(anomaly_score, fv_dict)
@@ -167,15 +169,15 @@ def analyze_session(feature_vector) -> dict:
     band = _risk_band(anomaly_score)  # legacy, kept for backward compatibility
 
     result = {
-        "anomaly_score":    round(anomaly_score, 4),
+        "anomaly_score": round(anomaly_score, 4),
         "attacker_profile": attacker_profile,
-        "risk_score":       risk_score,              # Step 10: unified risk
-        "risk_level":       risk_level,              # Step 10: classification
-        "risk_band":        band,                    # Step 8 legacy (deprecated)
+        "risk_score": risk_score,  # Step 10: unified risk
+        "risk_level": risk_level,  # Step 10: classification
+        "risk_band": band,  # Step 8 legacy (deprecated)
         # extras the policy engine may want:
-        "cluster_id":       cluster_id,
-        "timestamp":        datetime.now().isoformat(),
-        "risk_breakdown":   risk_result.get("breakdown", {}),
+        "cluster_id": cluster_id,
+        "timestamp": datetime.now().isoformat(),
+        "risk_breakdown": risk_result.get("breakdown", {}),
     }
 
     logger.info(
@@ -199,22 +201,22 @@ if __name__ == "__main__":
     # Simulated feature vector (replace with real Step 7 output)
     # Keys match CICIDS 2017 MachineLearningCVE column names
     test_vector = {
-        " Flow Duration":            500,
-        " Total Fwd Packets":        10,
-        " Total Backward Packets":   5,
+        " Flow Duration": 500,
+        " Total Fwd Packets": 10,
+        " Total Backward Packets": 5,
         "Total Length of Fwd Packets": 1200,
         " Total Length of Bwd Packets": 600,
-        " Fwd Packet Length Mean":   120.0,
-        " Bwd Packet Length Mean":   60.0,
-        " Flow Bytes/s":             1000.0,
-        " Flow Packets/s":           4500.0,
-        " Flow IAT Mean":            100.0,
-        " SYN Flag Count":           8,
-        " ACK Flag Count":           6,
-        " PSH Flag Count":           3,
-        " FIN Flag Count":           0,
-        " RST Flag Count":           0,
-        " Packet Length Variance":   -1.5,
+        " Fwd Packet Length Mean": 120.0,
+        " Bwd Packet Length Mean": 60.0,
+        " Flow Bytes/s": 1000.0,
+        " Flow Packets/s": 4500.0,
+        " Flow IAT Mean": 100.0,
+        " SYN Flag Count": 8,
+        " ACK Flag Count": 6,
+        " PSH Flag Count": 3,
+        " FIN Flag Count": 0,
+        " RST Flag Count": 0,
+        " Packet Length Variance": -1.5,
     }
 
     print("Input feature vector (subset shown):")
